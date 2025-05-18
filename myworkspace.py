@@ -1,123 +1,115 @@
+from tkinter import *
+from tkinter import simpledialog, messagebox
 import os
-import tkinter as tk
-from tkinter import messagebox, simpledialog, filedialog
 import shutil
 import zipfile
+import time
 
-is_dark_mode = False
+window = Tk()
+window.title("MyWorkspace")
+window.geometry("700x500")
+window.configure(bg="#f0f0f0")
 
-def apply_theme():
-    bg = "#1e1e1e" if is_dark_mode else "#f0f0f0"
-    fg = "#ffffff" if is_dark_mode else "#000000"
-    shadow = "#333333" if is_dark_mode else "#aaaaaa"
-    list_bg = "#2e2e2e" if is_dark_mode else "#ffffff"
+folder_path = StringVar()
+folder_path.set(os.getcwd())
 
-    root.configure(bg=bg)
-    label.config(bg=bg, fg=fg)
-    file_frame.config(bg=shadow)
-    file_list.config(bg=list_bg, fg=fg)
-    btn_frame.config(bg=bg)
-    toggle_btn.config(bg=list_bg, fg=fg, activebackground=shadow)
-
-    for frame in button_frames:
-        frame.config(bg=shadow)
-        for widget in frame.winfo_children():
-            widget.config(bg=list_bg, fg=fg, activebackground=shadow)
-
-def toggle_dark_mode():
-    global is_dark_mode
-    is_dark_mode = not is_dark_mode
-    apply_theme()
-
-def list_files():
-    file_list.delete(0, tk.END)
-    for file in os.listdir(folder_path):
-        file_list.insert(tk.END, file)
+def show_files():
+    file_list.delete(0, END)
+    try:
+        items = os.listdir(folder_path.get())
+        for name in items:
+            file_list.insert(END, name)
+    except:
+        pass
 
 def delete_files():
     selected = file_list.curselection()
-    for i in selected:
-        file_name = file_list.get(i)
-        full_path = os.path.join(folder_path, file_name)
+    for i in selected[::-1]:
+        name = file_list.get(i)
+        path = os.path.join(folder_path.get(), name)
         try:
-            if os.path.isfile(full_path):
-                os.remove(full_path)
-            elif os.path.isdir(full_path):
-                shutil.rmtree(full_path)
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-    list_files()
+            if os.path.isfile(path):
+                os.remove(path)
+            else:
+                shutil.rmtree(path)
+        except:
+            pass
+    show_files()
 
 def rename_file():
     selected = file_list.curselection()
-    if len(selected) != 1:
-        messagebox.showinfo("Rename", "Select only one file to rename.")
+    if not selected:
         return
     old_name = file_list.get(selected[0])
-    new_name = simpledialog.askstring("Rename", f"New name for {old_name}:")
+    new_name = simpledialog.askstring("Rename", "New name:")
     if new_name:
-        os.rename(os.path.join(folder_path, old_name), os.path.join(folder_path, new_name))
-        list_files()
+        os.rename(os.path.join(folder_path.get(), old_name), os.path.join(folder_path.get(), new_name))
+    show_files()
 
-def zip_folder():
-    save_path = filedialog.asksaveasfilename(defaultextension=".zip")
-    if not save_path:
+def zip_files():
+    folder_name = os.path.basename(folder_path.get())
+    zip_name = folder_name + ".zip"
+    with zipfile.ZipFile(zip_name, "w") as z:
+        for root, dirs, files in os.walk(folder_path.get()):
+            for f in files:
+                path = os.path.join(root, f)
+                z.write(path, os.path.relpath(path, folder_path.get()))
+    show_files()
+
+def search_file():
+    word = simpledialog.askstring("Search", "File name:")
+    if not word:
         return
-    with zipfile.ZipFile(save_path, "w") as zipf:
-        for file in os.listdir(folder_path):
-            full_path = os.path.join(folder_path, file)
-            zipf.write(full_path, file)
-    messagebox.showinfo("Zip", "Folder zipped!")
+    file_list.delete(0, END)
+    for name in os.listdir(folder_path.get()):
+        if word.lower() in name.lower():
+            file_list.insert(END, name)
 
-def search_files():
-    keyword = simpledialog.askstring("Search", "Enter part of a file name:")
-    if not keyword:
+def toggle_theme():
+    if window["bg"] == "#f0f0f0":
+        window.configure(bg="#1e1e1e")
+        top_bar.configure(bg="#1e1e1e")
+        file_list.configure(bg="#2b2b2b", fg="white")
+    else:
+        window.configure(bg="#f0f0f0")
+        top_bar.configure(bg="#f0f0f0")
+        file_list.configure(bg="white", fg="black")
+
+def new_folder():
+    name = simpledialog.askstring("New Folder", "Folder name:")
+    if name:
+        new_path = os.path.join(folder_path.get(), name)
+        if not os.path.exists(new_path):
+            os.makedirs(new_path)
+        show_files()
+
+def file_info():
+    selected = file_list.curselection()
+    if not selected:
         return
-    file_list.delete(0, tk.END)
-    for file in os.listdir(folder_path):
-        if keyword.lower() in file.lower():
-            file_list.insert(tk.END, file)
+    name = file_list.get(selected[0])
+    path = os.path.join(folder_path.get(), name)
+    info = os.stat(path)
+    size = info.st_size
+    created = time.ctime(info.st_ctime)
+    changed = time.ctime(info.st_mtime)
+    is_folder = os.path.isdir(path)
+    text = f"Name: {name}\nType: {'Folder' if is_folder else 'File'}\nSize: {size} bytes\nCreated: {created}\nModified: {changed}"
+    messagebox.showinfo("Info", text)
 
-# Setup
-folder_path = os.getcwd()
-root = tk.Tk()
-root.title("🧰 MyWorkspace")
+top_bar = Frame(window, bg="#f0f0f0")
+top_bar.pack(fill=X)
 
-label = tk.Label(root, text=f"📁 Folder: {folder_path}", font=("Segoe UI", 11), anchor="w")
-label.pack(fill="x", padx=10, pady=5)
+Button(top_bar, text="🗑 Delete", command=delete_files).pack(side=LEFT, padx=5, pady=5)
+Button(top_bar, text="✏️ Rename", command=rename_file).pack(side=LEFT, padx=5, pady=5)
+Button(top_bar, text="📦 Zip", command=zip_files).pack(side=LEFT, padx=5, pady=5)
+Button(top_bar, text="🔍 Search", command=search_file).pack(side=LEFT, padx=5, pady=5)
+Button(top_bar, text="🌙 Dark Mode", command=toggle_theme).pack(side=LEFT, padx=5, pady=5)
+Button(top_bar, text="📁 New Folder", command=new_folder).pack(side=LEFT, padx=5, pady=5)
+Button(top_bar, text="📊 View Info", command=file_info).pack(side=LEFT, padx=5, pady=5)
 
-file_frame = tk.Frame(root, bd=1, relief="sunken")
-file_frame.pack(padx=10, pady=5, fill="both", expand=True)
+file_list = Listbox(window, selectmode=EXTENDED, bg="white", fg="black")
+file_list.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-file_list = tk.Listbox(file_frame, selectmode=tk.MULTIPLE, font=("Segoe UI", 10), bd=0, highlightthickness=0, relief="flat")
-file_list.pack(side="left", fill="both", expand=True, padx=(1, 0), pady=1)
-
-scrollbar = tk.Scrollbar(file_frame, command=file_list.yview)
-scrollbar.pack(side="right", fill="y")
-file_list.config(yscrollcommand=scrollbar.set)
-
-btn_frame = tk.Frame(root)
-btn_frame.pack(pady=10)
-
-button_frames = []
-
-def shadow_button(text, command):
-    frame = tk.Frame(btn_frame)
-    frame.pack(side="left", padx=6, pady=4)
-    btn = tk.Button(frame, text=text, command=command, font=("Segoe UI", 10),
-                    width=10, bd=1, relief="flat")
-    btn.pack()
-    button_frames.append(frame)
-
-shadow_button("🔄 Refresh", list_files)
-shadow_button("🗑️ Delete", delete_files)
-shadow_button("✏️ Rename", rename_file)
-shadow_button("📦 Zip", zip_folder)
-shadow_button("🔍 Search", search_files)
-
-toggle_btn = tk.Button(root, text="🌙 Toggle Dark Mode", command=toggle_dark_mode, font=("Segoe UI", 10), bd=1)
-toggle_btn.pack(pady=(0, 10))
-
-apply_theme()
-list_files()
-root.mainloop()
+show_files()
+window.mainloop()
