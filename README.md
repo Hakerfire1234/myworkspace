@@ -31,7 +31,7 @@ Drop it into any folder and manage everything — view, delete, rename, zip, and
 Clone the repo:
 
 ```
-git clone https://github.com/yourusername/myworkspace.git
+git clone https://github.com/Hakerfire1234/myworkspace.git
 cd myworkspace
 python myworkspace.py
 ```
